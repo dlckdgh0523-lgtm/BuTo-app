@@ -1,0 +1,10 @@
+{
+  "name": "@buto/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --experimental-transform-types src/main.ts"
+  }
+}
+

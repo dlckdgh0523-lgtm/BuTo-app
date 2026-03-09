@@ -1,0 +1,17 @@
+{
+  "name": "buto",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.0.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "node --experimental-transform-types apps/api/src/main.ts",
+    "test:domain": "node --experimental-transform-types --test packages/contracts/test/*.test.ts packages/policy/test/*.test.ts apps/api/test/*.test.ts",
+    "show:routes": "node --experimental-transform-types apps/api/src/main.ts --routes"
+  }
+}
+
