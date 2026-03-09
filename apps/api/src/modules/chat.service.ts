@@ -7,6 +7,24 @@ import { createId, nowIso } from "../utils.ts";
 export class ChatService {
   constructor(private readonly store: InMemoryStore) {}
 
+  private assertParticipant(jobId: string, userId: string) {
+    const job = this.store.jobs.get(jobId);
+    if (!job) {
+      return fail("JOB_NOT_FOUND", "의뢰를 찾을 수 없어요.");
+    }
+
+    const isParticipant = userId === job.clientUserId || userId === job.matchedRunnerUserId;
+    if (!isParticipant) {
+      return fail("CHAT_NOT_AUTHORIZED", "대화 참여자만 채팅을 사용할 수 있어요.");
+    }
+
+    if (!job.matchedRunnerUserId) {
+      return fail("CHAT_NOT_READY", "매칭 후에만 채팅을 사용할 수 있어요.");
+    }
+
+    return ok(job);
+  }
+
   ensureRoom(jobId: string) {
     const existing = [...this.store.chatRooms.values()].find((room) => room.jobId === jobId);
     if (existing) {
@@ -29,7 +47,12 @@ export class ChatService {
     return room;
   }
 
-  getRoom(jobId: string) {
+  getRoom(jobId: string, userId: string) {
+    const job = this.assertParticipant(jobId, userId);
+    if (job.resultType === "ERROR") {
+      return job;
+    }
+
     const room = this.ensureRoom(jobId);
     return ok({
       roomId: room.roomId,
@@ -40,14 +63,19 @@ export class ChatService {
   }
 
   sendMessage(jobId: string, senderUserId: string, body: string, messageType: "text" | "image" = "text") {
-    const job = this.store.jobs.get(jobId);
-    if (!job) {
-      return fail("JOB_NOT_FOUND", "의뢰를 찾을 수 없어요.");
+    const authorizedJob = this.assertParticipant(jobId, senderUserId);
+    if (authorizedJob.resultType === "ERROR") {
+      return authorizedJob;
     }
+    const job = authorizedJob.success;
 
     const room = this.ensureRoom(jobId);
     if (room.status !== "OPEN") {
       return fail("CHAT_LOCKED", "안전상의 이유로 채팅이 잠겨 있어요.");
+    }
+
+    if (!body.trim()) {
+      return fail("CHAT_MESSAGE_INVALID", "빈 메시지는 전송할 수 없어요.");
     }
 
     const moderation = moderateChatMessage(body, job.status);
@@ -66,7 +94,7 @@ export class ChatService {
     messages.push(message);
     this.store.chatMessages.set(room.roomId, messages);
 
-    if (moderation.status === "SEVERE_BLOCK" || moderation.status === "BLOCKED") {
+    if (moderation.status === "SEVERE_BLOCK") {
       room.status = "LOCKED";
       job.hasDispute = true;
       job.status =
@@ -84,4 +112,3 @@ export class ChatService {
     });
   }
 }
-

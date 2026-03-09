@@ -1,4 +1,5 @@
-import { fail, ok, type RouteDescriptor } from "../../../packages/contracts/src/index.ts";
+import { productConfig } from "../../../packages/config/src/index.ts";
+import { fail, ok, type RouteDescriptor, type UserRole } from "../../../packages/contracts/src/index.ts";
 
 import { createStore } from "./bootstrap.ts";
 import { AdminService } from "./modules/admin.service.ts";
@@ -19,9 +20,16 @@ export interface AppRequest {
   headers: Headers;
 }
 
-type AppHandler = (request: AppRequest, params: Record<string, string>) => unknown;
+type RequestContext =
+  | { kind: "public" }
+  | { kind: "internal"; actor: "SYSTEM" }
+  | { kind: "user"; userId: string; roleFlags: string[] };
+
+type RouteAuth = "public" | "user" | "admin" | "user-or-internal";
+type AppHandler = (request: AppRequest, params: Record<string, string>, context: RequestContext) => unknown;
 
 interface RouteRegistration extends RouteDescriptor {
+  auth: RouteAuth;
   handler: AppHandler;
 }
 
@@ -42,39 +50,45 @@ export function createApp() {
       method: "POST",
       path: "/auth/toss/login/callback",
       summary: "토스 로그인 콜백 처리",
-      handler: () => auth.loginCallback()
+      auth: "public",
+      handler: (request) => auth.loginCallback(resolveLoginUserId(request.headers))
     },
     {
       method: "POST",
       path: "/auth/verify/adult",
       summary: "성인 인증 상태 확인",
-      handler: (request) => auth.verifyAdult(resolveUserId(request.headers))
+      auth: "user",
+      handler: (_request, _params, context) => auth.verifyAdult(requireUserContext(context).userId)
     },
     {
       method: "POST",
       path: "/auth/reauth",
       summary: "민감 행위 재인증",
-      handler: (request) => auth.reauth(resolveUserId(request.headers))
+      auth: "user",
+      handler: (_request, _params, context) => auth.reauth(requireUserContext(context).userId)
     },
     {
       method: "GET",
       path: "/me",
       summary: "현재 사용자 상태 조회",
-      handler: (request) => auth.getMe(resolveUserId(request.headers))
+      auth: "user",
+      handler: (_request, _params, context) => auth.getMe(requireUserContext(context).userId)
     },
     {
       method: "GET",
       path: "/safety/rules/current",
       summary: "안전수칙 조회",
+      auth: "public",
       handler: () => safety.getCurrentRules()
     },
     {
       method: "POST",
       path: "/safety/acknowledgements",
       summary: "안전수칙 동의 저장",
-      handler: (request) =>
+      auth: "user",
+      handler: (request, _params, context) =>
         safety.acknowledge(
-          resolveUserId(request.headers),
+          requireUserContext(context).userId,
           String(request.body?.rulesVersion ?? ""),
           Boolean(request.body?.acknowledged),
           request.body?.deviceHash ? String(request.body.deviceHash) : undefined
@@ -83,10 +97,11 @@ export function createApp() {
     {
       method: "POST",
       path: "/auth/toss-face/session",
-      summary: "토스 얼굴 인증 세션 시작",
-      handler: (request) =>
+      summary: "토스 원터치 인증 세션 시작",
+      auth: "user",
+      handler: (request, _params, context) =>
         auth.createFaceAuthSession(
-          resolveUserId(request.headers),
+          requireUserContext(context).userId,
           String(request.body?.intent ?? "JOB_CREATE") as "JOB_CREATE" | "PAYMENT_CONFIRM",
           request.body?.jobDraftId ? String(request.body.jobDraftId) : undefined
         )
@@ -94,10 +109,11 @@ export function createApp() {
     {
       method: "POST",
       path: "/auth/toss-face/complete",
-      summary: "토스 얼굴 인증 결과 반영",
-      handler: (request) =>
+      summary: "토스 원터치 인증 결과 반영",
+      auth: "user",
+      handler: (request, _params, context) =>
         auth.completeFaceAuth(
-          resolveUserId(request.headers),
+          requireUserContext(context).userId,
           String(request.body?.faceAuthSessionId ?? ""),
           String(request.body?.providerTransactionId ?? ""),
           String(request.body?.result ?? "FAIL") as "SUCCESS" | "FAIL" | "CANCELLED"
@@ -107,9 +123,10 @@ export function createApp() {
       method: "POST",
       path: "/jobs",
       summary: "의뢰 생성",
-      handler: (request) =>
+      auth: "user",
+      handler: (request, _params, context) =>
         jobs.createJob(
-          resolveUserId(request.headers),
+          requireUserContext(context).userId,
           request.body as never,
           String(request.body?.faceAuthSessionId ?? "")
         )
@@ -118,45 +135,76 @@ export function createApp() {
       method: "GET",
       path: "/jobs/nearby",
       summary: "근처 의뢰 조회",
+      auth: "user",
       handler: () => jobs.getNearbyJobs()
     },
     {
       method: "GET",
       path: "/jobs/:jobId",
       summary: "의뢰 상세 조회",
-      handler: (_request, params) => jobs.getJob(params.jobId)
+      auth: "user",
+      handler: (_request, params, context) => {
+        const userContext = requireUserContext(context);
+        return jobs.getJob(params.jobId, userContext.userId, userContext.roleFlags);
+      }
     },
     {
       method: "POST",
       path: "/jobs/:jobId/status",
       summary: "의뢰 상태 변경",
-      handler: (request, params) =>
-        jobs.updateStatus(
+      auth: "user-or-internal",
+      handler: (request, params, context) => {
+        const actor = resolveActor(context, request.headers);
+        if (actor.resultType === "ERROR") {
+          return actor;
+        }
+
+        return jobs.updateStatus(
           params.jobId,
-          resolveActor(request.headers),
+          context.kind === "user" ? context.userId : undefined,
+          actor.success,
           String(request.body?.nextStatus ?? "") as never
-        )
+        );
+      }
     },
     {
       method: "POST",
       path: "/jobs/:jobId/assign",
       summary: "부르미 확정",
-      handler: (request, params) => jobs.matchJob(params.jobId, String(request.body?.runnerUserId ?? ""))
+      auth: "user",
+      handler: (request, params, context) => {
+        const actor = resolveActor(context, request.headers);
+        if (actor.resultType === "ERROR") {
+          return actor;
+        }
+
+        if (actor.success !== "RUNNER") {
+          return fail("MATCH_NOT_ALLOWED", "부르미만 의뢰를 수락할 수 있어요.");
+        }
+
+        return jobs.matchJob(
+          params.jobId,
+          requireUserContext(context).userId,
+          request.body?.runnerUserId ? String(request.body.runnerUserId) : undefined
+        );
+      }
     },
     {
       method: "GET",
       path: "/jobs/:jobId/chat",
       summary: "채팅방 조회",
-      handler: (_request, params) => chat.getRoom(params.jobId)
+      auth: "user",
+      handler: (_request, params, context) => chat.getRoom(params.jobId, requireUserContext(context).userId)
     },
     {
       method: "POST",
       path: "/jobs/:jobId/chat/messages",
       summary: "채팅 메시지 전송",
-      handler: (request, params) =>
+      auth: "user",
+      handler: (request, params, context) =>
         chat.sendMessage(
           params.jobId,
-          resolveUserId(request.headers),
+          requireUserContext(context).userId,
           String(request.body?.body ?? ""),
           String(request.body?.messageType ?? "text") as "text" | "image"
         )
@@ -165,22 +213,22 @@ export function createApp() {
       method: "POST",
       path: "/jobs/:jobId/location-log",
       summary: "위치 로그 저장",
-      handler: (request, params) =>
-        tracking.logLocation(params.jobId, resolveUserId(request.headers), {
-          role: String(request.body?.role ?? "RUNNER") as "CLIENT" | "RUNNER",
+      auth: "user",
+      handler: (request, params, context) =>
+        tracking.logLocation(params.jobId, requireUserContext(context).userId, {
           lat: Number(request.body?.lat ?? 0),
           lng: Number(request.body?.lng ?? 0),
           accuracy: Number(request.body?.accuracy ?? 999),
-          source: String(request.body?.source ?? "app") as "app" | "background" | "manual",
-          loggedAt: request.body?.loggedAt ? String(request.body.loggedAt) : undefined
+          source: String(request.body?.source ?? "app") as "app" | "background" | "manual"
         })
     },
     {
       method: "POST",
       path: "/jobs/:jobId/proof-photo/complete",
       summary: "증빙 사진 등록",
-      handler: (request, params) =>
-        tracking.completeProof(params.jobId, resolveUserId(request.headers), {
+      auth: "user",
+      handler: (request, params, context) =>
+        tracking.completeProof(params.jobId, requireUserContext(context).userId, {
           proofType: String(request.body?.proofType ?? "pickup") as "pickup" | "delivery",
           s3Key: String(request.body?.s3Key ?? "")
         })
@@ -189,16 +237,18 @@ export function createApp() {
       method: "POST",
       path: "/payments/jobs/:jobId/init",
       summary: "결제 주문 생성",
-      handler: (request, params) => payments.initPayment(params.jobId, resolveUserId(request.headers))
+      auth: "user",
+      handler: (_request, params, context) => payments.initPayment(params.jobId, requireUserContext(context).userId)
     },
     {
       method: "POST",
       path: "/payments/jobs/:jobId/confirm",
       summary: "결제 승인 및 held 처리",
-      handler: (request, params) =>
+      auth: "user",
+      handler: (request, params, context) =>
         payments.confirmPayment(
           params.jobId,
-          resolveUserId(request.headers),
+          requireUserContext(context).userId,
           String(request.body?.paymentOrderId ?? ""),
           String(request.body?.faceAuthSessionId ?? "")
         )
@@ -207,14 +257,16 @@ export function createApp() {
       method: "POST",
       path: "/payouts/jobs/:jobId/release",
       summary: "정산 릴리스 가능 여부 평가",
+      auth: "admin",
       handler: (_request, params) => payments.evaluateRelease(params.jobId)
     },
     {
       method: "POST",
       path: "/reviews",
       summary: "리뷰 작성",
-      handler: (request) =>
-        community.createReview(resolveUserId(request.headers), {
+      auth: "user",
+      handler: (request, _params, context) =>
+        community.createReview(requireUserContext(context).userId, {
           jobId: String(request.body?.jobId ?? ""),
           targetUserId: String(request.body?.targetUserId ?? ""),
           ratingValue: Number(request.body?.ratingValue ?? 0),
@@ -225,20 +277,23 @@ export function createApp() {
       method: "GET",
       path: "/users/:userId/reviews",
       summary: "사용자 리뷰 조회",
+      auth: "user",
       handler: (_request, params) => community.listUserReviews(params.userId)
     },
     {
       method: "GET",
       path: "/community/posts",
       summary: "커뮤니티 게시물 조회",
+      auth: "user",
       handler: () => community.listPosts()
     },
     {
       method: "POST",
       path: "/community/posts",
       summary: "커뮤니티 게시물 작성",
-      handler: (request) =>
-        community.createPost(resolveUserId(request.headers), {
+      auth: "user",
+      handler: (request, _params, context) =>
+        community.createPost(requireUserContext(context).userId, {
           title: String(request.body?.title ?? ""),
           body: String(request.body?.body ?? ""),
           imageUrl: request.body?.imageUrl ? String(request.body.imageUrl) : undefined
@@ -248,66 +303,83 @@ export function createApp() {
       method: "POST",
       path: "/reports",
       summary: "일반 신고 생성",
-      handler: (request) =>
-        reports.createReport(request.headers.get("idempotency-key") ?? undefined, {
-          jobId: request.body?.jobId ? String(request.body.jobId) : undefined,
-          targetUserId: String(request.body?.targetUserId ?? ""),
-          reportType: String(request.body?.reportType ?? "OTHER"),
-          detail: request.body?.detail ? String(request.body.detail) : undefined
-        })
+      auth: "user",
+      handler: (request, _params, context) =>
+        reports.createReport(
+          request.headers.get("idempotency-key") ?? undefined,
+          requireUserContext(context).userId,
+          {
+            jobId: request.body?.jobId ? String(request.body.jobId) : undefined,
+            targetUserId: String(request.body?.targetUserId ?? ""),
+            reportType: String(request.body?.reportType ?? "OTHER"),
+            detail: request.body?.detail ? String(request.body.detail) : undefined
+          }
+        )
     },
     {
       method: "POST",
       path: "/emergency-events",
       summary: "긴급 이벤트 생성",
-      handler: (request) =>
-        reports.createEmergency(request.headers.get("idempotency-key") ?? undefined, {
-          jobId: String(request.body?.jobId ?? ""),
-          eventType: String(request.body?.eventType ?? "SOS"),
-          lat: Number(request.body?.lat ?? 0),
-          lng: Number(request.body?.lng ?? 0)
-        })
+      auth: "user",
+      handler: (request, _params, context) =>
+        reports.createEmergency(
+          request.headers.get("idempotency-key") ?? undefined,
+          requireUserContext(context).userId,
+          {
+            jobId: String(request.body?.jobId ?? ""),
+            eventType: String(request.body?.eventType ?? "SOS"),
+            lat: Number(request.body?.lat ?? 0),
+            lng: Number(request.body?.lng ?? 0)
+          }
+        )
     },
     {
       method: "GET",
       path: "/admin/review-queue",
       summary: "위험 검수 큐",
+      auth: "admin",
       handler: () => admin.reviewQueue()
     },
     {
       method: "GET",
       path: "/admin/disputes",
       summary: "분쟁 센터",
+      auth: "admin",
       handler: () => admin.disputeCenter()
     },
     {
       method: "GET",
       path: "/admin/emergencies",
       summary: "긴급 이벤트 피드",
+      auth: "admin",
       handler: () => admin.emergencyFeed()
     },
     {
       method: "GET",
       path: "/admin/documents",
       summary: "서류 승인 큐",
+      auth: "admin",
       handler: () => admin.documentsQueue()
     },
     {
       method: "GET",
       path: "/admin/payout-holds",
       summary: "정산 보류 큐",
+      auth: "admin",
       handler: () => admin.payoutHolds()
     },
     {
       method: "GET",
       path: "/admin/policies",
       summary: "정책 사전",
+      auth: "admin",
       handler: () => admin.policyDictionary()
     },
     {
       method: "GET",
       path: "/health",
       summary: "헬스체크",
+      auth: "public",
       handler: () => ok({ status: "ok" })
     }
   ];
@@ -320,18 +392,90 @@ export function createApp() {
         return fail("NOT_FOUND", "요청한 경로를 찾을 수 없어요.");
       }
 
+      const context = resolveRequestContext(match.auth, request.headers, auth);
+      if (context.resultType === "ERROR") {
+        return context;
+      }
+
       const params = extractParams(match.path, request.path);
-      return match.handler(request, params);
+      return match.handler(request, params, context.success);
     }
   };
 }
 
-function resolveUserId(headers: Headers): string {
+function resolveLoginUserId(headers: Headers): string {
   return headers.get("x-user-id") ?? "client-1";
 }
 
-function resolveActor(headers: Headers) {
-  return (headers.get("x-actor-role") ?? "CLIENT") as "CLIENT" | "RUNNER" | "SYSTEM" | "ADMIN";
+function requireUserContext(context: RequestContext) {
+  if (context.kind !== "user") {
+    throw new Error("User context required");
+  }
+
+  return context;
+}
+
+function resolveRequestContext(authMode: RouteAuth, headers: Headers, authService: AuthService) {
+  if (authMode === "public") {
+    return ok({ kind: "public" } as const);
+  }
+
+  if (authMode === "user-or-internal" && headers.get("x-internal-key") === productConfig.internalSystemKey) {
+    return ok({ kind: "internal", actor: "SYSTEM" as const });
+  }
+
+  const authorization = headers.get("authorization");
+  if (!authorization?.startsWith("Bearer ")) {
+    return fail("AUTH_REQUIRED", "로그인이 필요해요.");
+  }
+
+  const authenticated = authService.authenticateAccessToken(authorization.slice("Bearer ".length));
+  if (authenticated.resultType === "ERROR") {
+    return authenticated;
+  }
+
+  if (authMode === "admin" && !authenticated.success.roleFlags.includes("ADMIN")) {
+    return fail("FORBIDDEN", "관리자 권한이 필요해요.");
+  }
+
+  return ok({
+    kind: "user" as const,
+    userId: authenticated.success.userId,
+    roleFlags: authenticated.success.roleFlags
+  });
+}
+
+function resolveActor(context: RequestContext, headers: Headers) {
+  if (context.kind === "internal") {
+    return ok("SYSTEM" as const);
+  }
+
+  const requestedActor = headers.get("x-actor-role");
+  if (!requestedActor) {
+    if (context.roleFlags.includes("CLIENT")) {
+      return ok("CLIENT" as const);
+    }
+    if (context.roleFlags.includes("RUNNER")) {
+      return ok("RUNNER" as const);
+    }
+    if (context.roleFlags.includes("ADMIN")) {
+      return ok("ADMIN" as const);
+    }
+
+    return fail("ACTOR_ROLE_NOT_ALLOWED", "이 요청을 수행할 역할이 없어요.");
+  }
+
+  if (requestedActor === "CLIENT" && context.roleFlags.includes("CLIENT")) {
+    return ok("CLIENT" as const);
+  }
+  if (requestedActor === "RUNNER" && context.roleFlags.includes("RUNNER")) {
+    return ok("RUNNER" as const);
+  }
+  if (requestedActor === "ADMIN" && context.roleFlags.includes("ADMIN")) {
+    return ok("ADMIN" as const);
+  }
+
+  return fail("ACTOR_ROLE_NOT_ALLOWED", "해당 역할로 요청할 수 없어요.");
 }
 
 function matchPath(routePath: string, actualPath: string): boolean {

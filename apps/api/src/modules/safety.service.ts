@@ -36,9 +36,8 @@ export class SafetyService {
     user.safetyAcknowledgedAt = nowIso();
     return ok({
       acknowledgedAt: user.safetyAcknowledgedAt,
-      nextReviewAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
+      reconfirmOnNextLogin: true,
       deviceHash: deviceHash ?? "unknown-device"
     });
   }
 }
-

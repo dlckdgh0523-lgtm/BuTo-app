@@ -97,6 +97,7 @@ function seedCommunityPosts(): CommunityPost[] {
 export function createStore(): InMemoryStore {
   return {
     users: new Map(seedUsers().map((user) => [user.userId, user])),
+    accessSessions: new Map(),
     jobs: new Map(),
     chatRooms: new Map(),
     chatMessages: new Map(),

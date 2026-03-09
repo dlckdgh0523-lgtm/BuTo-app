@@ -14,3 +14,12 @@ test("warning content still delivers", () => {
   assert.equal(result.status, "WARN");
 });
 
+test("severe content with removed spaces is still blocked", () => {
+  const result = moderateChatMessage("통장보내 otp도같이", "MATCHED");
+  assert.equal(result.status, "SEVERE_BLOCK");
+});
+
+test("warning content with removed spaces still warns", () => {
+  const result = moderateChatMessage("공동현관비밀번호 알려주세요", "MATCHED");
+  assert.equal(result.status, "WARN");
+});

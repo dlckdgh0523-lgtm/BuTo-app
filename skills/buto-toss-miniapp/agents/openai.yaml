@@ -1,0 +1,4 @@
+interface:
+  display_name: "BUTO Toss Miniapp"
+  short_description: "Apps-in-Toss 구현과 검증 워크플로우"
+  default_prompt: "Use $buto-toss-miniapp to implement or review an Apps-in-Toss flow for BUTO."

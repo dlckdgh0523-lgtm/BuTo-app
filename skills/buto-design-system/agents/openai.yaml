@@ -1,0 +1,4 @@
+interface:
+  display_name: "BUTO Design System"
+  short_description: "안전 중심 BUTO UI와 카피 설계 워크플로우"
+  default_prompt: "Use $buto-design-system to design or refine a BUTO screen with safety-first UX."

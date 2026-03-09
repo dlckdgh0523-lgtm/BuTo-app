@@ -1,4 +1,4 @@
-import { fail, getAllowedTransitions, ok, type CreateJobRequest, type JobDetail, type JobStatus, type RunnerEligibilitySnapshot, type UserRole } from "../../../../packages/contracts/src/index.ts";
+import { fail, getAllowedTransitions, ok, type CreateJobRequest, type JobCard, type JobStatus, type RunnerEligibilitySnapshot, type UserRole } from "../../../../packages/contracts/src/index.ts";
 import { evaluateJobRisk } from "../../../../packages/policy/src/index.ts";
 
 import type { AuthService } from "./auth.service.ts";
@@ -22,7 +22,7 @@ export class JobsService {
       return fail("SAFETY_ACK_REQUIRED", "안전수칙 확인이 먼저 필요해요.");
     }
 
-    const faceAuth = this.authService.assertValidFaceAuth(userId, faceAuthSessionId);
+    const faceAuth = this.authService.assertValidFaceAuth(userId, faceAuthSessionId, "JOB_CREATE");
     if (faceAuth.resultType === "ERROR") {
       return faceAuth;
     }
@@ -59,23 +59,49 @@ export class JobsService {
     });
   }
 
-  getJob(jobId: string) {
-    const job = this.store.jobs.get(jobId);
-    return job ? ok(job) : fail("JOB_NOT_FOUND", "의뢰를 찾을 수 없어요.");
-  }
-
-  getNearbyJobs(): ReturnType<typeof ok<{ items: JobDetail[] }>> {
-    return ok({
-      items: [...this.store.jobs.values()].filter(
-        (job) => job.status === "OPEN" || job.status === "OFFERING"
-      )
-    });
-  }
-
-  updateStatus(jobId: string, actor: UserRole, nextStatus: JobStatus) {
+  getJob(jobId: string, requesterUserId: string, requesterRoleFlags: string[]) {
     const job = this.store.jobs.get(jobId);
     if (!job) {
       return fail("JOB_NOT_FOUND", "의뢰를 찾을 수 없어요.");
+    }
+
+    const isAdmin = requesterRoleFlags.includes("ADMIN");
+    const isParticipant = requesterUserId === job.clientUserId || requesterUserId === job.matchedRunnerUserId;
+    if (!isAdmin && !isParticipant) {
+      return fail("JOB_ACCESS_DENIED", "이 의뢰 상세를 볼 권한이 없어요.");
+    }
+
+    return ok(job);
+  }
+
+  getNearbyJobs(): ReturnType<typeof ok<{ items: JobCard[] }>> {
+    return ok({
+      items: [...this.store.jobs.values()].filter(
+        (job) => (job.status === "OPEN" || job.status === "OFFERING") && !job.requiresManualReview
+      ).map((job) => ({
+        jobId: job.jobId,
+        title: job.title,
+        distanceKm: 0,
+        offerAmount: job.offerAmount,
+        transportRequirement: job.transportRequirement,
+        status: job.status,
+        riskLevel: job.riskLevel
+      }))
+    });
+  }
+
+  updateStatus(jobId: string, actorUserId: string | undefined, actor: UserRole, nextStatus: JobStatus) {
+    const job = this.store.jobs.get(jobId);
+    if (!job) {
+      return fail("JOB_NOT_FOUND", "의뢰를 찾을 수 없어요.");
+    }
+
+    if (actor === "CLIENT" && actorUserId !== job.clientUserId) {
+      return fail("JOB_ACTOR_NOT_AUTHORIZED", "의뢰자만 이 상태를 변경할 수 있어요.");
+    }
+
+    if (actor === "RUNNER" && actorUserId !== job.matchedRunnerUserId) {
+      return fail("JOB_ACTOR_NOT_AUTHORIZED", "매칭된 부르미만 이 상태를 변경할 수 있어요.");
     }
 
     if (!getAllowedTransitions(job.status, actor).includes(nextStatus)) {
@@ -94,14 +120,27 @@ export class JobsService {
     });
   }
 
-  matchJob(jobId: string, runnerUserId: string) {
+  matchJob(jobId: string, actorUserId: string, runnerUserId?: string) {
     const job = this.store.jobs.get(jobId);
-    const runner = this.store.users.get(runnerUserId);
+    const requestedRunnerUserId = runnerUserId ?? actorUserId;
+    const runner = this.store.users.get(requestedRunnerUserId);
     if (!job || !runner) {
       return fail("MATCH_NOT_AVAILABLE", "매칭할 수 없어요.");
     }
 
-    const eligibility = this.getRunnerEligibility(runnerUserId);
+    if (actorUserId !== requestedRunnerUserId) {
+      return fail("MATCH_NOT_ALLOWED", "부르미 본인만 의뢰를 수락할 수 있어요.");
+    }
+
+    if (job.status !== "OFFERING") {
+      return fail("MATCH_NOT_AVAILABLE", "지금은 이 의뢰를 수락할 수 없어요.");
+    }
+
+    if (job.matchedRunnerUserId) {
+      return fail("MATCH_NOT_AVAILABLE", "이미 매칭된 의뢰예요.");
+    }
+
+    const eligibility = this.getRunnerEligibility(requestedRunnerUserId);
     if (eligibility.resultType === "ERROR") {
       return eligibility;
     }
@@ -110,11 +149,11 @@ export class JobsService {
       return fail("RUNNER_NOT_ELIGIBLE", "이 의뢰를 수락할 수 없는 부르미예요.");
     }
 
-    job.matchedRunnerUserId = runnerUserId;
+    job.matchedRunnerUserId = requestedRunnerUserId;
     job.status = "MATCHED";
     return ok({
       jobId,
-      runnerUserId,
+      runnerUserId: requestedRunnerUserId,
       status: job.status
     });
   }

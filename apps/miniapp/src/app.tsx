@@ -7,7 +7,7 @@ const mockSession = {
   nickname: "서초의뢰자",
   adultVerified: true,
   safetyAcknowledged: false,
-  faceAuthValid: false
+  tossAuthValid: false
 };
 
 type TabKey = "home" | "request" | "nearby" | "active" | "reviews" | "profile";
@@ -15,7 +15,7 @@ type TabKey = "home" | "request" | "nearby" | "active" | "reviews" | "profile";
 export function MiniApp() {
   const [tab, setTab] = useState<TabKey>("home");
   const [safetyAcknowledged, setSafetyAcknowledged] = useState(mockSession.safetyAcknowledged);
-  const [faceAuthValid, setFaceAuthValid] = useState(mockSession.faceAuthValid);
+  const [tossAuthValid, setTossAuthValid] = useState(mockSession.tossAuthValid);
 
   if (!safetyAcknowledged) {
     return <SafetyAcknowledgementScreen onAcknowledge={() => setSafetyAcknowledged(true)} />;
@@ -32,7 +32,7 @@ export function MiniApp() {
           </p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <StatusBadge label={faceAuthValid ? "얼굴 인증 유효" : "얼굴 인증 필요"} tone={faceAuthValid ? "brand" : "warning"} />
+          <StatusBadge label={tossAuthValid ? "토스 인증 유효" : "토스 인증 필요"} tone={tossAuthValid ? "brand" : "warning"} />
           <StatusBadge label={`${productConfig.locationLogIntervalMinutes}분 위치기록`} tone="default" />
         </div>
       </header>
@@ -61,7 +61,7 @@ export function MiniApp() {
 
       <main style={{ display: "grid", gap: 20 }}>
         {tab === "home" && <HomeScreen />}
-        {tab === "request" && <CreateJobScreen faceAuthValid={faceAuthValid} onStartFaceAuth={() => setFaceAuthValid(true)} />}
+        {tab === "request" && <CreateJobScreen tossAuthValid={tossAuthValid} onStartTossAuth={() => setTossAuthValid(true)} />}
         {tab === "nearby" && <NearbyJobsScreen />}
         {tab === "active" && <ActiveJobScreen />}
         {tab === "reviews" && <ReviewsCommunityScreen />}
@@ -101,7 +101,7 @@ function HomeScreen() {
     <section style={gridTwoColumnStyle}>
       <Panel title="빠른 시작" subtitle="앱인토스 등록 기능 3개를 홈에서 바로 진입합니다.">
         <div style={{ display: "grid", gap: 12 }}>
-          <QuickAction title="심부름 요청하기" body="얼굴 인증 후 결제 승인과 함께 의뢰를 생성해요." />
+          <QuickAction title="심부름 요청하기" body="토스 원터치 인증 후 결제 승인과 함께 의뢰를 생성해요." />
           <QuickAction title="근처 의뢰 보기" body="부르미가 조건에 맞는 의뢰만 빠르게 볼 수 있어요." />
           <QuickAction title="내 진행중 의뢰" body="상태 단계, 채팅, 사진 증빙, 긴급 신고를 한 곳에서 관리해요." />
         </div>
@@ -117,7 +117,7 @@ function HomeScreen() {
   );
 }
 
-function CreateJobScreen(props: { faceAuthValid: boolean; onStartFaceAuth(): void }) {
+function CreateJobScreen(props: { tossAuthValid: boolean; onStartTossAuth(): void }) {
   return (
     <section style={gridTwoColumnStyle}>
       <Panel title="심부름 요청하기" subtitle="저위험 생활 심부름만 등록할 수 있어요.">
@@ -128,12 +128,12 @@ function CreateJobScreen(props: { faceAuthValid: boolean; onStartFaceAuth(): voi
           <Field label="도착지" value="서울 강남구 역삼동" />
           <Field label="요청 금액" value="18,000원" />
           <div style={cardStyle}>
-            <StatusBadge label={props.faceAuthValid ? "토스 얼굴 인증 완료" : "토스 얼굴 인증 필요"} tone={props.faceAuthValid ? "brand" : "warning"} />
+            <StatusBadge label={props.tossAuthValid ? "토스 원터치 인증 완료" : "토스 원터치 인증 필요"} tone={props.tossAuthValid ? "brand" : "warning"} />
             <p style={{ margin: "12px 0 0", color: "#57534e", lineHeight: 1.6 }}>
-              클라이언트의 의뢰 생성과 결제 승인은 토스 등록 얼굴 기반 얼굴 인증 성공 후 {productConfig.faceAuthWindowMinutes}분 이내에만 가능해요.
+              클라이언트의 의뢰 생성과 결제 승인은 토스 앱 원터치 인증 성공 후 {productConfig.faceAuthWindowMinutes}분 이내에만 가능해요. 실제 인증은 토스 앱에서 PIN 또는 단말 생체인증(Face ID, 지문 등)으로 진행될 수 있어요.
             </p>
-            <button style={{ ...secondaryButtonStyle, marginTop: 16 }} onClick={props.onStartFaceAuth}>
-              토스 얼굴 인증 시작
+            <button style={{ ...secondaryButtonStyle, marginTop: 16 }} onClick={props.onStartTossAuth}>
+              토스 원터치 인증 시작
             </button>
           </div>
         </div>
@@ -141,16 +141,16 @@ function CreateJobScreen(props: { faceAuthValid: boolean; onStartFaceAuth(): voi
       <Panel title="결제 및 정책 검사" subtitle="정책 검사를 통과해야 게시할 수 있어요.">
         <ul style={listStyle}>
           <li>금칙어, 은어, 야간 고액 패턴을 동기 검사해요.</li>
-          <li>결제 버튼은 얼굴 인증 전까지 비활성화돼요.</li>
+          <li>결제 버튼은 토스 원터치 인증 전까지 비활성화돼요.</li>
           <li>차량/1톤 조건에 맞는 부르미에게만 의뢰가 노출돼요.</li>
         </ul>
         <button
           style={{
             ...primaryButtonStyle,
-            opacity: props.faceAuthValid ? 1 : 0.45,
-            cursor: props.faceAuthValid ? "pointer" : "not-allowed"
+            opacity: props.tossAuthValid ? 1 : 0.45,
+            cursor: props.tossAuthValid ? "pointer" : "not-allowed"
           }}
-          disabled={!props.faceAuthValid}
+          disabled={!props.tossAuthValid}
         >
           결제하고 요청 올리기
         </button>
@@ -245,8 +245,8 @@ function ProfileScreen() {
       <div style={{ display: "grid", gap: 12 }}>
         <Field label="닉네임" value={mockSession.nickname} />
         <Field label="성인 인증" value="완료" />
-        <Field label="안전수칙 확인" value="최신 버전 확인 완료" />
-        <Field label="얼굴 인증 유효" value="민감 행위 전 재인증 가능" />
+        <Field label="안전수칙 확인" value="로그인 후 다시 확인 필요" />
+        <Field label="토스 인증 유효" value="민감 행위 전 재인증 가능" />
       </div>
     </Panel>
   );
@@ -386,4 +386,3 @@ const chatBubbleStyle: React.CSSProperties = {
   background: "#f5f5f4",
   maxWidth: 360
 };
-

@@ -13,6 +13,16 @@ export class CommunityService {
       return fail("REVIEW_NOT_ALLOWED", "완료된 거래에만 리뷰를 남길 수 있어요.");
     }
 
+    const isParticipant = userId === job.clientUserId || userId === job.matchedRunnerUserId;
+    if (!isParticipant) {
+      return fail("REVIEW_NOT_AUTHORIZED", "거래에 참여한 사용자만 리뷰를 작성할 수 있어요.");
+    }
+
+    const counterpartUserId = userId === job.clientUserId ? job.matchedRunnerUserId : job.clientUserId;
+    if (!counterpartUserId || payload.targetUserId !== counterpartUserId) {
+      return fail("REVIEW_TARGET_INVALID", "거래 상대방에게만 리뷰를 작성할 수 있어요.");
+    }
+
     const existing = [...this.store.reviews.values()].find(
       (review) =>
         review.jobId === payload.jobId &&
@@ -64,4 +74,3 @@ export class CommunityService {
     return ok(post);
   }
 }
-

@@ -66,6 +66,7 @@ export interface ProofPhoto {
 
 export interface InMemoryStore {
   users: Map<string, DemoUser>;
+  accessSessions: Map<string, { userId: string; refreshToken: string; issuedAt: string }>;
   jobs: Map<string, StoredJob>;
   chatRooms: Map<string, ChatRoom>;
   chatMessages: Map<string, ChatMessage[]>;

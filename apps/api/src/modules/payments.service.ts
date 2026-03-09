@@ -17,6 +17,19 @@ export class PaymentsService {
       return fail("PAYMENT_INIT_NOT_ALLOWED", "결제 주문을 생성할 수 없어요.");
     }
 
+    if (job.status !== "PAYMENT_PENDING") {
+      return fail("PAYMENT_INIT_NOT_ALLOWED", "이 의뢰 상태에서는 결제를 시작할 수 없어요.");
+    }
+
+    const existing = [...this.store.payments.values()].find((entry) => entry.jobId === jobId);
+    if (existing) {
+      return ok({
+        paymentOrderId: existing.orderId,
+        amount: existing.amountTotal,
+        feeAmount: existing.amountTotal - existing.heldAmount
+      });
+    }
+
     const payment = {
       paymentId: createId("pay"),
       jobId,
@@ -49,7 +62,15 @@ export class PaymentsService {
       return fail("PAYMENT_NOT_FOUND", "결제 주문을 찾을 수 없어요.");
     }
 
-    const faceAuth = this.authService.assertValidFaceAuth(clientUserId, faceAuthSessionId);
+    if (job.status !== "PAYMENT_PENDING") {
+      return fail("PAYMENT_CONFIRM_NOT_ALLOWED", "이 의뢰 상태에서는 결제를 승인할 수 없어요.");
+    }
+
+    if (payment.status !== "INITIATED") {
+      return fail("PAYMENT_CONFIRM_NOT_ALLOWED", "이미 처리된 결제예요.");
+    }
+
+    const faceAuth = this.authService.assertValidFaceAuth(clientUserId, faceAuthSessionId, "PAYMENT_CONFIRM");
     if (faceAuth.resultType === "ERROR") {
       return faceAuth;
     }
@@ -82,4 +103,3 @@ export class PaymentsService {
     return ok(decision);
   }
 }
-

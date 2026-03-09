@@ -17,10 +17,12 @@ const warnPatterns = ["공동현관", "비밀번호", "메신저로", "전화번
 
 export function moderateChatMessage(message: string, jobStatus: JobStatus): ModerationDecision {
   const lowered = message.toLowerCase();
+  const normalized = lowered.replace(/\s+/g, "");
   const reasons: string[] = [];
 
   for (const pattern of severePatterns) {
-    if (lowered.includes(pattern.toLowerCase())) {
+    const normalizedPattern = pattern.toLowerCase().replace(/\s+/g, "");
+    if (normalized.includes(normalizedPattern)) {
       reasons.push(`severe:${pattern}`);
     }
   }
@@ -39,7 +41,8 @@ export function moderateChatMessage(message: string, jobStatus: JobStatus): Mode
   }
 
   for (const pattern of warnPatterns) {
-    if (lowered.includes(pattern.toLowerCase())) {
+    const normalizedPattern = pattern.toLowerCase().replace(/\s+/g, "");
+    if (normalized.includes(normalizedPattern)) {
       reasons.push(`warn:${pattern}`);
     }
   }
@@ -58,4 +61,3 @@ export function moderateChatMessage(message: string, jobStatus: JobStatus): Mode
     reasons: []
   };
 }
-

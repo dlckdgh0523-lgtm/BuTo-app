@@ -132,13 +132,14 @@ export interface FaceAuthSession {
   userId: string;
   jobDraftId?: string;
   intent: FaceAuthIntent;
-  provider: "TOSS_FACE_AUTH";
+  provider: "TOSS_ONE_TOUCH_AUTH";
   expiresAt: string;
 }
 
 export interface ReportRecord {
   reportId: string;
   jobId?: string;
+  reporterUserId: string;
   targetUserId: string;
   reportType: ReportType;
   detail?: string;
@@ -178,4 +179,3 @@ export interface RouteDescriptor {
   path: string;
   summary: string;
 }
-
