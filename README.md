@@ -1,27 +1,106 @@
+
+## 4) `BuTo-app` — `README.md`
+
+```md
 # BUTO v1 MVP
 
-BUTO is a location-based errand-call platform for Apps in Toss, scoped to a safety-first MVP.
+BUTO는 Apps in Toss 환경을 고려해 설계한 위치 기반 심부름 연결 서비스 MVP입니다.  
+초기 단계부터 기능 확장보다 안전성과 운영 리스크를 먼저 고려한 scaffold-first 형태의 프로젝트입니다.
 
-## Workspace layout
+## 프로젝트 소개
 
-- `apps/api`: in-memory API skeleton centered on auth, jobs, chat moderation, reports, payments, and admin views
-- `apps/miniapp`: React miniapp shell for the Apps in Toss client experience
-- `apps/admin`: React admin console shell for risk and CS workflows
-- `packages/contracts`: shared enums, DTOs, API response types, and state-machine helpers
-- `packages/policy`: policy engine for risk scoring, chat moderation, masking, and payout release decisions
-- `packages/ui`: shared UI primitives and theme tokens
-- `packages/config`: environment and product defaults
+이 프로젝트는 위치 기반 심부름 연결 서비스를 만들기 위해 시작했으며,
+단순 매칭보다 아래 항목을 먼저 고려했습니다.
 
-## Status
+- 사용자 신뢰와 안전
+- 채팅 리스크 관리
+- 신고 / 제재 흐름
+- 관리자 대응 가능성
+- 도메인 규칙의 명확한 정의
 
-This repository is intentionally scaffold-first. It locks the product contracts and core domain rules without requiring external package installation.
+현재 저장소는 MVP의 핵심 계약과 도메인 규칙을 먼저 고정하는 형태로 구성되어 있습니다.
 
-## Local commands
+## 핵심 목표
+
+- Apps in Toss 미니앱 형태의 클라이언트 구조 정리
+- API / Admin / Policy / UI 계층 분리
+- 도메인 규칙과 상태 전이를 먼저 정의
+- 추후 실제 서비스 구현으로 확장 가능한 기반 만들기
+
+## 워크스페이스 구조
 
 ```bash
+apps/
+  api
+  miniapp
+  admin
+
+packages/
+  contracts
+  policy
+  ui
+  config
+각 영역 설명
+apps/api
+
+인증, 심부름 요청, 채팅 검수, 신고, 결제, 관리자 뷰 등 핵심 도메인 API를 위한 스켈레톤입니다.
+
+apps/miniapp
+
+Apps in Toss 클라이언트 환경을 고려한 React 기반 미니앱 셸입니다.
+
+apps/admin
+
+리스크 관리, CS 대응, 운영 정책 확인을 위한 관리자 콘솔 셸입니다.
+
+packages/contracts
+
+공통 enum, DTO, 응답 타입, 상태 전이 헬퍼를 정리하는 영역입니다.
+
+packages/policy
+
+리스크 점수, 채팅 검수, 마스킹, 정산 조건 등을 다루는 정책 엔진 영역입니다.
+
+packages/ui
+
+공용 UI 프리미티브와 디자인 토큰을 정리합니다.
+
+packages/config
+
+환경 변수와 제품 기본 설정을 관리합니다.
+
+내가 집중한 부분
+
+서비스 구현 전, 도메인 규칙과 계약을 먼저 고정하는 방식
+
+안전 중심 MVP 설계
+
+추후 실제 개발 단계에서 흔들리지 않도록 구조 선설계
+
+관리자 관점의 리스크 관리 흐름 포함
+
+현재 상태
+
+이 저장소는 scaffold-first 상태입니다.
+즉, 외형보다 제품 계약과 핵심 도메인 규칙을 먼저 정리하는 데 초점을 두고 있습니다.
+
+실행 가능한 명령어
 npm run show:routes
 npm run test:domain
-```
+향후 개선 계획
 
-`pnpm` is declared as the workspace package manager for future installation, but the current scaffold can be inspected and partially verified with the built-in Node.js runtime.
+실제 DB 연동
 
+인증 및 사용자 흐름 구체화
+
+위치 정보 처리 및 요청/수락 플로우 구현
+
+채팅 moderation 고도화
+
+관리자 운영 화면 구현
+
+포트폴리오 메모
+
+이 프로젝트는
+기능을 급하게 붙이기보다 도메인 규칙과 리스크를 먼저 설계한 경험
+으로 설명할 수 있는 프로젝트입니다.
