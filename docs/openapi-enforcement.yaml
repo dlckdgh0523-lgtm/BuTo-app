@@ -1,0 +1,510 @@
+openapi: 3.1.0
+info:
+  title: BUTO Enforcement API
+  version: 1.0.0
+  description: Enforcement, appeals, and reinstatement endpoints for the BUTO Apps-in-Toss backend.
+servers:
+  - url: https://api.buto.example
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    ApiError:
+      type: object
+      properties:
+        resultType:
+          type: string
+          const: ERROR
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+              additionalProperties: true
+      required: [resultType, error]
+    EnforcementScope:
+      type: string
+      enum: [ACCOUNT_FULL, CHAT_ONLY, MATCHING_DISABLED, PAYOUT_HOLD]
+    EnforcementReviewStatus:
+      type: string
+      enum: [AUTO_APPLIED, UNDER_REVIEW, APPEAL_PENDING, MORE_INFO_REQUESTED, UPHELD, REINSTATED]
+    AccountStatus:
+      type: string
+      enum: [ACTIVE, RESTRICTED, SUSPENDED, APPEAL_PENDING, REINSTATED, PERMANENTLY_BANNED, WITHDRAWN]
+    AccountRestrictionInfo:
+      type: object
+      required: [status, reasonCode, reasonMessage, source, scope, reviewStatus, updatedAt]
+      properties:
+        status:
+          $ref: '#/components/schemas/AccountStatus'
+        actionId:
+          type: string
+        reasonCode:
+          type: string
+        reasonMessage:
+          type: string
+        source:
+          type: string
+          enum: [AI_MODERATION, ADMIN_POLICY, SELF_WITHDRAWAL]
+        scope:
+          $ref: '#/components/schemas/EnforcementScope'
+        reviewStatus:
+          $ref: '#/components/schemas/EnforcementReviewStatus'
+        updatedAt:
+          type: string
+          format: date-time
+        supportAction:
+          type: string
+          enum: [KAKAO_CHANNEL]
+    UserEnforcementAction:
+      type: object
+      required:
+        - actionId
+        - userId
+        - statusApplied
+        - source
+        - scope
+        - reviewStatus
+        - reasonCode
+        - reasonMessage
+        - appealEligible
+        - evidenceBundleId
+        - createdAt
+      properties:
+        actionId:
+          type: string
+        userId:
+          type: string
+        statusApplied:
+          $ref: '#/components/schemas/AccountStatus'
+        source:
+          type: string
+          enum: [AI_MODERATION, ADMIN_POLICY]
+        scope:
+          $ref: '#/components/schemas/EnforcementScope'
+        reviewStatus:
+          $ref: '#/components/schemas/EnforcementReviewStatus'
+        reasonCode:
+          type: string
+        reasonMessage:
+          type: string
+        appealEligible:
+          type: boolean
+        evidenceBundleId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        liftedAt:
+          type: string
+          format: date-time
+        liftedByActionId:
+          type: string
+    EnforcementEvidenceBundle:
+      type: object
+      required: [evidenceBundleId, evidenceType, summary, createdAt]
+      properties:
+        evidenceBundleId:
+          type: string
+        evidenceType:
+          type: string
+        summary:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    EnforcementActionWithEvidence:
+      allOf:
+        - $ref: '#/components/schemas/UserEnforcementAction'
+        - type: object
+          properties:
+            evidenceBundle:
+              $ref: '#/components/schemas/EnforcementEvidenceBundle'
+    AppealStatus:
+      type: string
+      enum: [SUBMITTED, MORE_INFO_REQUESTED, APPROVED, REJECTED]
+    UserAppeal:
+      type: object
+      required: [appealId, userId, actionId, appealText, status, submittedAt, lastUpdatedAt]
+      properties:
+        appealId:
+          type: string
+        userId:
+          type: string
+        actionId:
+          type: string
+        appealText:
+          type: string
+        status:
+          $ref: '#/components/schemas/AppealStatus'
+        submittedAt:
+          type: string
+          format: date-time
+        lastUpdatedAt:
+          type: string
+          format: date-time
+    AppealReviewAction:
+      type: object
+      required: [reviewActionId, appealId, actionId, reviewerUserId, decision, createdAt]
+      properties:
+        reviewActionId:
+          type: string
+        appealId:
+          type: string
+        actionId:
+          type: string
+        reviewerUserId:
+          type: string
+        decision:
+          type: string
+          enum: [APPROVE, REJECT, REQUEST_MORE_INFO]
+        note:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    EnforcementStatusSummary:
+      type: object
+      required: [userId, status]
+      properties:
+        userId:
+          type: string
+        status:
+          $ref: '#/components/schemas/AccountStatus'
+        restriction:
+          $ref: '#/components/schemas/AccountRestrictionInfo'
+        latestAction:
+          $ref: '#/components/schemas/UserEnforcementAction'
+        latestAppeal:
+          $ref: '#/components/schemas/UserAppeal'
+        supportAction:
+          type: string
+          enum: [KAKAO_CHANNEL]
+paths:
+  /me/enforcement-status:
+    get:
+      summary: Get current enforcement status for the logged-in user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Enforcement status summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  resultType:
+                    type: string
+                    const: SUCCESS
+                  success:
+                    $ref: '#/components/schemas/EnforcementStatusSummary'
+                required: [resultType, success]
+        default:
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /me/enforcement-actions:
+    get:
+      summary: List cumulative enforcement actions for the logged-in user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Enforcement action list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  resultType:
+                    type: string
+                    const: SUCCESS
+                  success:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/EnforcementActionWithEvidence'
+                required: [resultType, success]
+        default:
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /appeals:
+    post:
+      summary: Submit an appeal for an enforcement action
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [appealText]
+              properties:
+                actionId:
+                  type: string
+                appealText:
+                  type: string
+      responses:
+        '200':
+          description: Appeal created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  resultType:
+                    type: string
+                    const: SUCCESS
+                  success:
+                    $ref: '#/components/schemas/UserAppeal'
+                required: [resultType, success]
+        default:
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /appeals/{appealId}:
+    get:
+      summary: Get appeal detail including review actions
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: appealId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Appeal detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  resultType:
+                    type: string
+                    const: SUCCESS
+                  success:
+                    type: object
+                    allOf:
+                      - $ref: '#/components/schemas/UserAppeal'
+                      - type: object
+                        properties:
+                          action:
+                            $ref: '#/components/schemas/UserEnforcementAction'
+                          reviewActions:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/AppealReviewAction'
+                required: [resultType, success]
+        default:
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /admin/appeals/{appealId}/request-more-info:
+    post:
+      summary: Request more information for an appeal
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: appealId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note:
+                  type: string
+      responses:
+        '200':
+          description: Appeal moved to more-info-requested
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  resultType:
+                    type: string
+                    const: SUCCESS
+                  success:
+                    type: object
+                    properties:
+                      appealId:
+                        type: string
+                      status:
+                        $ref: '#/components/schemas/AppealStatus'
+                required: [resultType, success]
+        default:
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /admin/appeals/{appealId}/approve:
+    post:
+      summary: Approve an appeal and reinstate the user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: appealId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note:
+                  type: string
+      responses:
+        '200':
+          description: Appeal approved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  resultType:
+                    type: string
+                    const: SUCCESS
+                  success:
+                    type: object
+                    properties:
+                      appealId:
+                        type: string
+                      status:
+                        $ref: '#/components/schemas/AppealStatus'
+                      userStatus:
+                        $ref: '#/components/schemas/AccountStatus'
+                required: [resultType, success]
+        default:
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /admin/appeals/{appealId}/reject:
+    post:
+      summary: Reject an appeal and keep the enforcement state
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: appealId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note:
+                  type: string
+      responses:
+        '200':
+          description: Appeal rejected
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  resultType:
+                    type: string
+                    const: SUCCESS
+                  success:
+                    type: object
+                    properties:
+                      appealId:
+                        type: string
+                      status:
+                        $ref: '#/components/schemas/AppealStatus'
+                      userStatus:
+                        $ref: '#/components/schemas/AccountStatus'
+                required: [resultType, success]
+        default:
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /admin/enforcement-actions/{actionId}/reinstate:
+    post:
+      summary: Reinstate a user directly from a specific enforcement action
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: actionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note:
+                  type: string
+      responses:
+        '200':
+          description: User reinstated from enforcement action
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  resultType:
+                    type: string
+                    const: SUCCESS
+                  success:
+                    type: object
+                    properties:
+                      userId:
+                        type: string
+                      status:
+                        $ref: '#/components/schemas/AccountStatus'
+                      actionId:
+                        type: string
+                required: [resultType, success]
+        default:
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'

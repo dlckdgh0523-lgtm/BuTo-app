@@ -1,6 +1,8 @@
 export const productConfig = {
   appName: "BUTO",
   rulesVersion: "2026-03-09.v1",
+  authTokenSecret: "dev-buto-auth-secret",
+  accessTokenTtlSeconds: 3600,
   internalSystemKey: "dev-buto-internal-key",
   faceAuthWindowMinutes: 5,
   sensitiveReauthWindowMinutes: 60,

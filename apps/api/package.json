@@ -4,7 +4,18 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node --experimental-transform-types src/main.ts"
+    "dev": "node --experimental-transform-types src/main.ts",
+    "db:migrate": "node --experimental-transform-types src/db/migrate.ts",
+    "runtime:readiness": "node --experimental-transform-types src/runtime-readiness.ts",
+    "runtime:readiness:report": "node --experimental-transform-types src/runtime-readiness.ts --format markdown --output ../../docs/submission/runtime-readiness-report.md --soft-exit",
+    "release:status": "node --experimental-transform-types src/release-status.ts",
+    "submission:bundle": "node --experimental-transform-types src/submission-bundle.ts",
+    "release:preflight": "node --experimental-transform-types src/release-preflight.ts",
+    "outbox:drain": "node --experimental-transform-types src/workers/outbox-worker.ts",
+    "push:dispatch": "node --experimental-transform-types src/workers/push-dispatch-worker.ts",
+    "idle-timeout:sweep": "node --experimental-transform-types src/workers/idle-timeout-worker.ts"
+  },
+  "dependencies": {
+    "pg": "^8.20.0"
   }
 }
-

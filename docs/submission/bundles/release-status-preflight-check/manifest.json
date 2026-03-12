@@ -1,0 +1,80 @@
+{
+  "bundleLabel": "release-status-preflight-check",
+  "environmentLabel": "production",
+  "generatedAt": "2026-03-10T05:00:23.901Z",
+  "readiness": {
+    "overallStatus": "ACTION_REQUIRED",
+    "blockers": 8,
+    "warnings": 2
+  },
+  "documents": [
+    {
+      "fileName": "app-registration-packet.md",
+      "title": "App registration packet",
+      "sourcePath": "/Users/apple/Desktop/buto/docs/submission/app-registration-packet.md"
+    },
+    {
+      "fileName": "launch-qa-report-template.md",
+      "title": "Launch QA report template",
+      "sourcePath": "/Users/apple/Desktop/buto/docs/submission/launch-qa-report-template.md"
+    },
+    {
+      "fileName": "apps-in-toss-release-checklist.md",
+      "title": "Apps-in-Toss release checklist",
+      "sourcePath": "/Users/apple/Desktop/buto/docs/apps-in-toss-release-checklist.md"
+    },
+    {
+      "fileName": "runtime-cutover-runbook.md",
+      "title": "Runtime cutover runbook",
+      "sourcePath": "/Users/apple/Desktop/buto/docs/ops/runtime-cutover-runbook.md"
+    },
+    {
+      "fileName": "proof-storage-s3-runbook.md",
+      "title": "Proof storage S3 runbook",
+      "sourcePath": "/Users/apple/Desktop/buto/docs/ops/proof-storage-s3-runbook.md"
+    },
+    {
+      "fileName": "runtime-readiness-report.md",
+      "title": "Runtime readiness markdown report",
+      "sourcePath": "/Users/apple/Desktop/buto/docs/submission/bundles/release-status-preflight-check/runtime-readiness-report.md"
+    },
+    {
+      "fileName": "runtime-readiness-report.json",
+      "title": "Runtime readiness JSON report",
+      "sourcePath": "/Users/apple/Desktop/buto/docs/submission/bundles/release-status-preflight-check/runtime-readiness-report.json"
+    },
+    {
+      "fileName": "owner-action-plan.md",
+      "title": "Owner-based cutover action plan",
+      "sourcePath": "/Users/apple/Desktop/buto/docs/submission/bundles/release-status-preflight-check/owner-action-plan.md"
+    },
+    {
+      "fileName": "owner-env-handoff.md",
+      "title": "Owner-based env handoff",
+      "sourcePath": "/Users/apple/Desktop/buto/docs/submission/bundles/release-status-preflight-check/owner-env-handoff.md"
+    },
+    {
+      "fileName": "release-status-snapshot.md",
+      "title": "Release status snapshot",
+      "sourcePath": "/Users/apple/Desktop/buto/docs/submission/bundles/release-status-preflight-check/release-status-snapshot.md"
+    }
+  ],
+  "envFiles": [
+    {
+      "fileName": "infra-env.example",
+      "owner": "INFRA"
+    },
+    {
+      "fileName": "security-env.example",
+      "owner": "SECURITY"
+    },
+    {
+      "fileName": "partnership-env.example",
+      "owner": "PARTNERSHIP"
+    },
+    {
+      "fileName": "backend-env.example",
+      "owner": "BACKEND"
+    }
+  ]
+}

@@ -1,20 +1,33 @@
 import type {
+  AccountRestrictionInfo,
+  AccountStatus,
+  AppealReviewAction,
   ChatMessage,
   CommunityPost,
   EmergencyEventRecord,
+  EnforcementEvidenceBundle,
   FaceAuthSession,
   JobDetail,
+  NotificationRecord,
   PaymentLedgerEntry,
+  PushDeliveryAttemptRecord,
+  PushSubscriptionRecord,
   ReportRecord,
   ReviewRecord,
-  RunnerEligibilitySnapshot
+  SupportFallbackRecord,
+  RunnerEligibilitySnapshot,
+  UserAppeal,
+  UserEnforcementAction,
+  WorkerHeartbeatRecord
 } from "../../../packages/contracts/src/index.ts";
 
 export interface DemoUser {
   userId: string;
+  ciHash: string;
+  tossUserKey?: string;
   nickname: string;
   adultVerified: boolean;
-  status: "ACTIVE" | "LOCKED" | "SUSPENDED";
+  status: AccountStatus;
   roleFlags: string[];
   safetyAcknowledgedAt?: string;
   runnerVerified: boolean;
@@ -25,6 +38,8 @@ export interface DemoUser {
   payoutAccountVerified: boolean;
   activeJobs: number;
   lastActiveAt: string;
+  restriction?: AccountRestrictionInfo;
+  withdrawnAt?: string;
 }
 
 export interface StoredJob extends JobDetail {
@@ -64,9 +79,65 @@ export interface ProofPhoto {
   createdAt: string;
 }
 
+export interface ProofUploadSession {
+  uploadSessionId: string;
+  jobId: string;
+  userId: string;
+  proofType: "pickup" | "delivery";
+  source: "camera" | "album";
+  objectKey: string;
+  status: "READY" | "UPLOADED" | "COMPLETED" | "EXPIRED";
+  localAssetPath?: string;
+  mimeType?: string;
+  imageId?: string;
+  createdAt: string;
+  expiresAt: string;
+  uploadedAt?: string;
+  completedAt?: string;
+}
+
+export interface JobCancellationRequest {
+  cancellationRequestId: string;
+  jobId: string;
+  requestedByUserId: string;
+  requesterRole: "CLIENT" | "SYSTEM";
+  reason: string;
+  status: "PENDING_RUNNER_CONFIRMATION" | "ACCEPTED" | "REJECTED" | "AUTO_CANCELLED";
+  requestedAt: string;
+  respondedAt?: string;
+  responseByUserId?: string;
+  responseNote?: string;
+  refundReasonNormalized?: string;
+}
+
+export interface RefreshSession {
+  userId: string;
+  issuedAt: string;
+  expiresAt: string;
+}
+
+export interface PendingLoginState {
+  state: string;
+  createdAt: string;
+  expiresAt: string;
+}
+
+export interface AuditLogEntry {
+  auditId: string;
+  actorUserId: string;
+  action: string;
+  entityType: "JOB" | "USER";
+  entityId: string;
+  note?: string;
+  before?: Record<string, unknown>;
+  after?: Record<string, unknown>;
+  createdAt: string;
+}
+
 export interface InMemoryStore {
   users: Map<string, DemoUser>;
-  accessSessions: Map<string, { userId: string; refreshToken: string; issuedAt: string }>;
+  loginStates: Map<string, PendingLoginState>;
+  refreshSessions: Map<string, RefreshSession>;
   jobs: Map<string, StoredJob>;
   chatRooms: Map<string, ChatRoom>;
   chatMessages: Map<string, ChatMessage[]>;
@@ -74,10 +145,22 @@ export interface InMemoryStore {
   payments: Map<string, PaymentLedgerEntry>;
   reports: Map<string, ReportRecord>;
   emergencies: Map<string, EmergencyEventRecord>;
+  proofUploadSessions: Map<string, ProofUploadSession>;
+  jobCancellationRequests: Map<string, JobCancellationRequest>;
   reviews: Map<string, ReviewRecord>;
   communityPosts: Map<string, CommunityPost>;
+  notifications: Map<string, NotificationRecord>;
+  pushSubscriptions: Map<string, PushSubscriptionRecord>;
+  pushDeliveryAttempts: Map<string, PushDeliveryAttemptRecord>;
+  supportFallbacks: Map<string, SupportFallbackRecord>;
+  userEnforcementActions: Map<string, UserEnforcementAction>;
+  enforcementEvidenceBundles: Map<string, EnforcementEvidenceBundle>;
+  userAppeals: Map<string, UserAppeal>;
+  appealReviewActions: Map<string, AppealReviewAction>;
+  workerHeartbeats: Map<string, WorkerHeartbeatRecord>;
   locationLogs: LocationLog[];
   proofPhotos: ProofPhoto[];
+  auditLogs: AuditLogEntry[];
   idempotency: Map<string, unknown>;
 }
 

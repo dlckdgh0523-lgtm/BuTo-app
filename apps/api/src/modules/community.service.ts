@@ -1,13 +1,17 @@
 import { fail, ok } from "../../../../packages/contracts/src/index.ts";
 import { maskSensitiveText } from "../../../../packages/policy/src/index.ts";
 
+import type { PersistenceAdapter } from "../persistence.ts";
 import type { InMemoryStore } from "../store.ts";
 import { createId, nowIso } from "../utils.ts";
 
 export class CommunityService {
-  constructor(private readonly store: InMemoryStore) {}
+  constructor(
+    private readonly store: InMemoryStore,
+    private readonly persistence: PersistenceAdapter
+  ) {}
 
-  createReview(userId: string, payload: { jobId: string; targetUserId: string; ratingValue: number; body: string }) {
+  async createReview(userId: string, payload: { jobId: string; targetUserId: string; ratingValue: number; body: string }) {
     const job = this.store.jobs.get(payload.jobId);
     if (!job || job.status !== "COMPLETED") {
       return fail("REVIEW_NOT_ALLOWED", "완료된 거래에만 리뷰를 남길 수 있어요.");
@@ -45,6 +49,15 @@ export class CommunityService {
     };
 
     this.store.reviews.set(review.reviewId, review);
+    try {
+      await this.persistence.withTransaction(async (tx) => {
+        await tx.upsertReview(review);
+      });
+    } catch (error) {
+      this.store.reviews.delete(review.reviewId);
+      throw error;
+    }
+
     return ok(review);
   }
 
@@ -60,7 +73,7 @@ export class CommunityService {
     });
   }
 
-  createPost(userId: string, payload: { title: string; body: string; imageUrl?: string }) {
+  async createPost(userId: string, payload: { title: string; body: string; imageUrl?: string }) {
     const post = {
       postId: createId("post"),
       authorUserId: userId,
@@ -71,6 +84,15 @@ export class CommunityService {
     };
 
     this.store.communityPosts.set(post.postId, post);
+    try {
+      await this.persistence.withTransaction(async (tx) => {
+        await tx.upsertCommunityPost(post);
+      });
+    } catch (error) {
+      this.store.communityPosts.delete(post.postId);
+      throw error;
+    }
+
     return ok(post);
   }
 }

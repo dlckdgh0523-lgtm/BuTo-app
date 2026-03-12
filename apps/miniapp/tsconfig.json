@@ -1,8 +1,16 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "rootDir": "./src"
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": true,
+    "types": ["react", "react-dom"],
+    "jsx": "react-jsx"
   },
-  "include": ["src/**/*"]
+  "include": [
+    "src/**/*",
+    "../../packages/config/src/**/*",
+    "../../packages/contracts/src/**/*",
+    "../../packages/ui/src/**/*"
+  ]
 }
-

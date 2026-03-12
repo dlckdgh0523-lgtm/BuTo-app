@@ -1,11 +1,23 @@
 import { fail, ok } from "../../../../packages/contracts/src/index.ts";
 import { moderateChatMessage } from "../../../../packages/policy/src/index.ts";
 
+import type { PersistenceAdapter } from "../persistence.ts";
 import type { InMemoryStore } from "../store.ts";
 import { createId, nowIso } from "../utils.ts";
+import type { CancellationService } from "./cancellation.service.ts";
+import type { EnforcementService } from "./enforcement.service.ts";
 
 export class ChatService {
-  constructor(private readonly store: InMemoryStore) {}
+  constructor(
+    private readonly store: InMemoryStore,
+    private readonly enforcementService: EnforcementService,
+    private readonly persistence: PersistenceAdapter,
+    private readonly cancellationService: CancellationService
+  ) {}
+
+  private findRoom(jobId: string) {
+    return [...this.store.chatRooms.values()].find((room) => room.jobId === jobId);
+  }
 
   private assertParticipant(jobId: string, userId: string) {
     const job = this.store.jobs.get(jobId);
@@ -25,8 +37,8 @@ export class ChatService {
     return ok(job);
   }
 
-  ensureRoom(jobId: string) {
-    const existing = [...this.store.chatRooms.values()].find((room) => room.jobId === jobId);
+  async ensureRoom(jobId: string, persistence: PersistenceAdapter = this.persistence) {
+    const existing = this.findRoom(jobId);
     if (existing) {
       return existing;
     }
@@ -43,17 +55,24 @@ export class ChatService {
     const job = this.store.jobs.get(jobId);
     if (job) {
       job.chatRoomId = room.roomId;
+      await persistence.upsertJob(job);
     }
+    await persistence.upsertChatRoom(room);
     return room;
   }
 
-  getRoom(jobId: string, userId: string) {
+  async getRoom(jobId: string, userId: string) {
+    const idleResult = await this.cancellationService.evaluateIdleTimeoutForJob(jobId);
+    if (idleResult.resultType === "ERROR") {
+      return idleResult;
+    }
+
     const job = this.assertParticipant(jobId, userId);
     if (job.resultType === "ERROR") {
       return job;
     }
 
-    const room = this.ensureRoom(jobId);
+    const room = await this.ensureRoom(jobId);
     return ok({
       roomId: room.roomId,
       status: room.status,
@@ -62,14 +81,25 @@ export class ChatService {
     });
   }
 
-  sendMessage(jobId: string, senderUserId: string, body: string, messageType: "text" | "image" = "text") {
+  async sendMessage(jobId: string, senderUserId: string, body: string, messageType: "text" | "image" = "text") {
+    const idleResult = await this.cancellationService.evaluateIdleTimeoutForJob(jobId);
+    if (idleResult.resultType === "ERROR") {
+      return idleResult;
+    }
+
     const authorizedJob = this.assertParticipant(jobId, senderUserId);
     if (authorizedJob.resultType === "ERROR") {
       return authorizedJob;
     }
     const job = authorizedJob.success;
 
-    const room = this.ensureRoom(jobId);
+    const existingRoom = this.findRoom(jobId);
+    let room = existingRoom ?? {
+      roomId: createId("room"),
+      jobId,
+      status: "OPEN" as const,
+      createdAt: nowIso()
+    };
     if (room.status !== "OPEN") {
       return fail("CHAT_LOCKED", "안전상의 이유로 채팅이 잠겨 있어요.");
     }
@@ -79,6 +109,19 @@ export class ChatService {
     }
 
     const moderation = moderateChatMessage(body, job.status);
+    const hadRoom = Boolean(existingRoom);
+    const roomSnapshot = structuredClone(room);
+    const jobSnapshot = structuredClone(job);
+    const existingMessages = hadRoom ? [...(this.store.chatMessages.get(room.roomId) ?? [])] : [];
+    const hadMessagesArray = hadRoom && this.store.chatMessages.has(room.roomId);
+    const originalJobChatRoomId = job.chatRoomId;
+
+    if (!hadRoom) {
+      this.store.chatRooms.set(room.roomId, room);
+      this.store.chatMessages.set(room.roomId, []);
+      job.chatRoomId = room.roomId;
+    }
+
     const message = {
       messageId: createId("msg"),
       roomId: room.roomId,
@@ -94,13 +137,81 @@ export class ChatService {
     messages.push(message);
     this.store.chatMessages.set(room.roomId, messages);
 
-    if (moderation.status === "SEVERE_BLOCK") {
-      room.status = "LOCKED";
-      job.hasDispute = true;
-      job.status =
-        job.status === "PICKED_UP" || job.status === "DELIVERING" || job.status === "DELIVERY_PROOF_SUBMITTED"
-          ? "DISPUTED"
-          : "CHAT_BLOCKED";
+    try {
+      await this.persistence.withTransaction(async (tx) => {
+        if (!hadRoom) {
+          await tx.upsertJob(job);
+          await tx.upsertChatRoom(room);
+        }
+
+        await tx.appendChatMessage(message);
+        await tx.enqueueOutboxEvent({
+          eventId: createId("evt"),
+          aggregateType: "CHAT_ROOM",
+          aggregateId: room.roomId,
+          eventType: "CHAT_MESSAGE_STORED",
+          payload: {
+            roomId: room.roomId,
+            jobId,
+            messageId: message.messageId,
+            senderUserId,
+            moderationStatus: message.moderationStatus
+          },
+          availableAt: nowIso()
+        });
+
+        if (moderation.status === "SEVERE_BLOCK") {
+          room.status = "LOCKED";
+          job.hasDispute = true;
+          job.status =
+            job.status === "PICKED_UP" || job.status === "DELIVERING" || job.status === "DELIVERY_PROOF_SUBMITTED"
+              ? "DISPUTED"
+              : "CHAT_BLOCKED";
+          await tx.upsertChatRoom(room);
+          await tx.upsertJob(job);
+          const enforcement = await this.enforcementService.applyAutomatedRestriction(
+            senderUserId,
+            {
+              reasonCode: "AI_POLICY_BLOCK",
+              reasonMessage: "부적절한 텍스트 또는 부정행위 패턴이 감지되어 운영정책에 따라 계정이 즉시 잠금 처리되었어요.",
+              scope: "ACCOUNT_FULL",
+              evidenceType: "CHAT_MESSAGE",
+              evidenceSummary: body,
+              evidenceMetadata: {
+                roomId: room.roomId,
+                jobId
+              }
+            },
+            tx
+          );
+          if (enforcement.resultType === "ERROR") {
+            throw enforcement;
+          }
+        }
+      });
+    } catch (error) {
+      this.store.jobs.set(jobId, jobSnapshot);
+      if (hadRoom) {
+        this.store.chatRooms.set(room.roomId, roomSnapshot);
+      } else {
+        this.store.chatRooms.delete(room.roomId);
+        job.chatRoomId = originalJobChatRoomId;
+      }
+      if (hadMessagesArray) {
+        this.store.chatMessages.set(room.roomId, existingMessages);
+      } else {
+        this.store.chatMessages.delete(room.roomId);
+      }
+      if (
+        error &&
+        typeof error === "object" &&
+        "resultType" in error &&
+        (error as { resultType?: string }).resultType === "ERROR"
+      ) {
+        return error;
+      }
+
+      throw error;
     }
 
     return ok({

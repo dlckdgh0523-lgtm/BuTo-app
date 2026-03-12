@@ -9,6 +9,8 @@ function seedUsers(): DemoUser[] {
   return [
     {
       userId: "client-1",
+      ciHash: "ci_client_1",
+      tossUserKey: "user-key-client-1",
       nickname: "서초의뢰자",
       adultVerified: true,
       status: "ACTIVE",
@@ -22,6 +24,8 @@ function seedUsers(): DemoUser[] {
     },
     {
       userId: "runner-1",
+      ciHash: "ci_runner_1",
+      tossUserKey: "user-key-runner-1",
       nickname: "도보부르미",
       adultVerified: true,
       status: "ACTIVE",
@@ -37,6 +41,8 @@ function seedUsers(): DemoUser[] {
     },
     {
       userId: "runner-2",
+      ciHash: "ci_runner_2",
+      tossUserKey: "user-key-runner-2",
       nickname: "1톤부르미",
       adultVerified: true,
       status: "ACTIVE",
@@ -53,6 +59,8 @@ function seedUsers(): DemoUser[] {
     },
     {
       userId: "admin-1",
+      ciHash: "ci_admin_1",
+      tossUserKey: "user-key-admin-1",
       nickname: "리스크운영",
       adultVerified: true,
       status: "ACTIVE",
@@ -97,7 +105,8 @@ function seedCommunityPosts(): CommunityPost[] {
 export function createStore(): InMemoryStore {
   return {
     users: new Map(seedUsers().map((user) => [user.userId, user])),
-    accessSessions: new Map(),
+    loginStates: new Map(),
+    refreshSessions: new Map(),
     jobs: new Map(),
     chatRooms: new Map(),
     chatMessages: new Map(),
@@ -105,10 +114,22 @@ export function createStore(): InMemoryStore {
     payments: new Map(),
     reports: new Map(),
     emergencies: new Map(),
+    proofUploadSessions: new Map(),
+    jobCancellationRequests: new Map(),
     reviews: new Map(seedReviews().map((review) => [review.reviewId, review])),
     communityPosts: new Map(seedCommunityPosts().map((post) => [post.postId, post])),
+    notifications: new Map(),
+    pushSubscriptions: new Map(),
+    pushDeliveryAttempts: new Map(),
+    supportFallbacks: new Map(),
+    userEnforcementActions: new Map(),
+    enforcementEvidenceBundles: new Map(),
+    userAppeals: new Map(),
+    appealReviewActions: new Map(),
+    workerHeartbeats: new Map(),
     locationLogs: [],
     proofPhotos: [],
+    auditLogs: [],
     idempotency: new Map([
       [
         "config",

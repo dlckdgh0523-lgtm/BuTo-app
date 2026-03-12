@@ -13,7 +13,7 @@ export const jobTransitions: TransitionMap = {
   },
   OPEN: {
     SYSTEM: ["OFFERING", "CANCELLED"],
-    ADMIN: ["CANCELLED"]
+    ADMIN: ["OFFERING", "CANCELLED"]
   },
   OFFERING: {
     RUNNER: ["MATCHED"],
@@ -80,4 +80,3 @@ export function getAllowedTransitions(current: JobStatus, actor: UserRole): JobS
 export function isValidJobTransition(current: JobStatus, next: JobStatus, actor: UserRole): boolean {
   return getAllowedTransitions(current, actor).includes(next);
 }
-

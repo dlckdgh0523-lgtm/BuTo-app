@@ -1,0 +1,9 @@
+# Security env handoff
+# Bundle: release-status-bundle-check
+# Environment: production
+
+BUTO_AUTH_TOKEN_SECRET=replace-with-production-secret
+BUTO_INTERNAL_SYSTEM_KEY=replace-with-production-internal-key
+TOSS_UNLINK_BASIC_USER=replace-with-unlink-user
+TOSS_UNLINK_BASIC_PASSWORD=replace-with-unlink-password
+

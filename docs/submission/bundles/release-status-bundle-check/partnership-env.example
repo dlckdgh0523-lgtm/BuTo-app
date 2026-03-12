@@ -1,0 +1,24 @@
+# Partnership env handoff
+# Bundle: release-status-bundle-check
+# Environment: production
+
+TOSS_LOGIN_TOKEN_URL=https://developers-apps-in-toss.example/token
+TOSS_LOGIN_ME_URL=https://developers-apps-in-toss.example/me
+TOSS_PARTNER_CLIENT_ID=replace-with-partner-client-id
+TOSS_PARTNER_CLIENT_SECRET=replace-with-partner-client-secret
+TOSS_PARTNER_CERT_PATH=/run/secrets/toss-partner.crt
+TOSS_PARTNER_KEY_PATH=/run/secrets/toss-partner.key
+TOSS_PARTNER_CA_PATH=/run/secrets/toss-partner-ca.crt
+TOSS_CERT_TOKEN_URL=https://cert.toss.im/oauth2/token
+TOSS_CERT_REQUEST_URL=https://cert.toss.im/api/request
+TOSS_CERT_STATUS_URL=https://cert.toss.im/api/status
+TOSS_CERT_RESULT_URL=https://cert.toss.im/api/result
+TOSS_CERT_CLIENT_ID=replace-with-cert-client-id
+TOSS_CERT_CLIENT_SECRET=replace-with-cert-client-secret
+TOSS_CERT_REQUEST_URL_SCHEME=buto://toss-cert
+TOSS_PAY_BASE_URL=https://pay-apps-in-toss-api.toss.im
+TOSS_PAY_CLIENT_ID=replace-with-pay-client-id
+TOSS_PAY_CLIENT_SECRET=replace-with-pay-client-secret
+TOSS_PAY_MERCHANT_ID=replace-with-pay-merchant-id
+TOSS_PAY_TEST_MODE=false
+

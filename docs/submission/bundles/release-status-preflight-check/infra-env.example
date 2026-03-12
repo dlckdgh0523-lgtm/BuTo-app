@@ -1,0 +1,17 @@
+# Infrastructure env handoff
+# Bundle: release-status-preflight-check
+# Environment: production
+
+BUTO_DATABASE_URL=postgres://user:password@db.example.com:5432/buto
+TOSS_PARTNER_CERT_PATH=/run/secrets/toss-partner.crt
+TOSS_PARTNER_KEY_PATH=/run/secrets/toss-partner.key
+TOSS_PARTNER_CA_PATH=/run/secrets/toss-partner-ca.crt
+BUTO_PROOF_STORAGE_PROVIDER=s3
+BUTO_PROOF_S3_BUCKET=buto-proof-prod
+BUTO_PROOF_S3_REGION=ap-northeast-2
+BUTO_PROOF_S3_ENDPOINT=https://s3.ap-northeast-2.amazonaws.com
+BUTO_PROOF_S3_ACCESS_KEY_ID=replace-with-proof-access-key
+BUTO_PROOF_S3_SECRET_ACCESS_KEY=replace-with-proof-secret-key
+BUTO_UPLOAD_PUBLIC_BASE_URL=https://api.example.com
+BUTO_PROOF_PUBLIC_BASE_URL=https://cdn.example.com/buto-proofs
+

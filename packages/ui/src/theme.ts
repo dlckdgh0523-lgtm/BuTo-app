@@ -1,18 +1,17 @@
 export const butoTheme = {
   colors: {
-    ink: "#132238",
-    brand: "#0f766e",
-    brandSoft: "#ccfbf1",
+    ink: "#191f28",
+    brand: "#3182f6",
+    brandSoft: "#e8f3ff",
     danger: "#dc2626",
-    caution: "#b45309",
-    sky: "#e0f2fe",
-    paper: "#fffdf8",
-    line: "#d6d3d1"
+    caution: "#c2790a",
+    sky: "#eff6ff",
+    paper: "#f8fafc",
+    line: "#e5e8eb"
   },
   radius: {
     card: 24,
     pill: 999
   },
-  shadow: "0 18px 60px rgba(15, 118, 110, 0.12)"
+  shadow: "0 18px 40px rgba(49, 130, 246, 0.08)"
 } as const;
-

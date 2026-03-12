@@ -1,6 +1,7 @@
 import { productConfig } from "../../../../packages/config/src/index.ts";
 import { fail, ok } from "../../../../packages/contracts/src/index.ts";
 
+import type { PersistenceAdapter } from "../persistence.ts";
 import type { InMemoryStore } from "../store.ts";
 import { nowIso } from "../utils.ts";
 
@@ -12,7 +13,10 @@ const ruleItems = [
 ] as const;
 
 export class SafetyService {
-  constructor(private readonly store: InMemoryStore) {}
+  constructor(
+    private readonly store: InMemoryStore,
+    private readonly persistence: PersistenceAdapter
+  ) {}
 
   getCurrentRules() {
     return ok({
@@ -23,7 +27,7 @@ export class SafetyService {
     });
   }
 
-  acknowledge(userId: string, rulesVersion: string, acknowledged: boolean, deviceHash?: string) {
+  async acknowledge(userId: string, rulesVersion: string, acknowledged: boolean, deviceHash?: string) {
     const user = this.store.users.get(userId);
     if (!user) {
       return fail("USER_NOT_FOUND", "사용자를 찾을 수 없어요.");
@@ -34,6 +38,7 @@ export class SafetyService {
     }
 
     user.safetyAcknowledgedAt = nowIso();
+    await this.persistence.upsertUser(user);
     return ok({
       acknowledgedAt: user.safetyAcknowledgedAt,
       reconfirmOnNextLogin: true,

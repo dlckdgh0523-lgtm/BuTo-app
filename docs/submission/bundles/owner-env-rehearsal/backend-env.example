@@ -1,0 +1,8 @@
+# Backend env handoff
+# Bundle: owner-env-rehearsal
+# Environment: production
+
+BUTO_ALLOWED_ORIGINS=https://apps-in-toss-sandbox.toss.im,https://apps-in-toss-live.toss.im
+BUTO_STRICT_RUNTIME_ENV=true
+BUTO_STRICT_DATABASE_ENV=true
+

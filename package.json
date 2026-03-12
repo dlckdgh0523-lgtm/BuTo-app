@@ -10,8 +10,22 @@
   ],
   "scripts": {
     "dev:api": "node --experimental-transform-types apps/api/src/main.ts",
+    "dev:miniapp": "pnpm --filter @buto/miniapp dev",
+    "build:miniapp": "pnpm --filter @buto/miniapp build",
     "test:domain": "node --experimental-transform-types --test packages/contracts/test/*.test.ts packages/policy/test/*.test.ts apps/api/test/*.test.ts",
-    "show:routes": "node --experimental-transform-types apps/api/src/main.ts --routes"
+    "show:routes": "node --experimental-transform-types apps/api/src/main.ts --routes",
+    "db:migrate": "pnpm --filter @buto/api db:migrate",
+    "runtime:readiness": "pnpm --filter @buto/api runtime:readiness",
+    "runtime:readiness:report": "pnpm --filter @buto/api runtime:readiness:report",
+    "release:status": "pnpm --filter @buto/api release:status",
+    "submission:bundle": "pnpm --filter @buto/api submission:bundle",
+    "release:preflight": "pnpm --filter @buto/api release:preflight",
+    "outbox:drain": "pnpm --filter @buto/api outbox:drain",
+    "push:dispatch": "pnpm --filter @buto/api push:dispatch",
+    "idle-timeout:sweep": "pnpm --filter @buto/api idle-timeout:sweep"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3"
   }
 }
-
